@@ -1,8 +1,10 @@
 import { Loop } from "./lyrcs";
 
 const dbName = 'abLoopRecorderDB';
-const dbVersion = 1;
+const dbVersion = 3;
 const storeName = 'Loops';
+const mediaStoreName = 'Media';
+const mediaStoreKey = 'media';
 
 // Open a database
 const request = indexedDB.open(dbName, dbVersion);
@@ -10,13 +12,37 @@ let db: any;
 request.onupgradeneeded = event => {
   db = (event.target as any).result;
   // Create an object store in the database
-  db.createObjectStore(storeName, { keyPath: 'start' });
+  if (!db.objectStoreNames.contains(storeName))
+    db.createObjectStore(storeName, { keyPath: 'start' });
+  if (!db.objectStoreNames.contains(mediaStoreName))
+    db.createObjectStore(mediaStoreName);
 };
 
 request.onsuccess = event => {
   db = (event.target as any).result;
   console.log("successfully loaded DB");
 };
+
+request.onerror = e => {
+  console.error((e.target as any | undefined).error.message);
+}
+
+export function saveMedia(media: Blob) {
+  const transaction = db.transaction(mediaStoreName, 'readwrite');
+  const store = transaction.objectStore(mediaStoreName);
+  store.put(media, mediaStoreKey);
+}
+
+export function removeMedia() {
+  // Add some objects to the store
+  const transaction = db.transaction(mediaStoreName, 'readwrite');
+  const store = transaction.objectStore(mediaStoreName);
+
+  const deleteRequest = store.delete(mediaStoreKey);
+  deleteRequest.onsuccess = () => {
+    console.log('media deleted');
+  };
+}
 
 export function saveLoop(loop: Loop) {
   // Add some objects to the store
@@ -55,7 +81,7 @@ export function deleteLoop(loop: Loop) {
   };
 }
 
-export function deleteSaveLoop(start: number, loop:Loop) {
+export function deleteSaveLoop(start: number, loop: Loop) {
   // Add some objects to the store
   const transaction = db.transaction(storeName, 'readwrite');
   const store = transaction.objectStore(storeName);
@@ -75,13 +101,29 @@ export function retrieveLoops(completion: (loops: Loop[]) => void) {
   const store = transaction.objectStore(storeName);
   // Retrieve all objects from the store
   const getAllRequest = store.getAll();
-  getAllRequest.onsuccess = (event:any) => {
+  getAllRequest.onsuccess = (event: any) => {
     completion(event.target.result);
   };
-  getAllRequest.onerror = (e:any) => {
+  getAllRequest.onerror = (e: any) => {
     console.error(e);
     completion([]);
   }
+}
+
+export function retreiveMedia() {
+  return new Promise((resolve) => {
+    const transaction = db.transaction(mediaStoreName, 'readwrite');
+    const store = transaction.objectStore(mediaStoreName);
+
+    const request = store.get(mediaStoreKey);
+    request.onsuccess = (e:any) => {
+      const blob = e.target.result;
+      resolve(blob);
+    }
+    request.onerror = (e: any) => {
+      console.error(e);
+    }
+  })
 }
 
 export function removeAllLoops() {

@@ -80,14 +80,13 @@ export default class Waveform {
 
     const maxBinCount = 200;
     const binWidth = cw / maxBinCount;
-    let index = at / Waveform.interval;
+    const atIndex = at / Waveform.interval;
 
-    const offsetLeft = -(index - Math.floor(index)) * binWidth;
+    const index = Math.floor(atIndex);
+    const offsetLeft = -(atIndex - index) * binWidth;
 
-    index = Math.floor(index);
-
-    let startingIndex = undefined;
-    let endingIndex = undefined;
+    let startingIndex:number|undefined = undefined;
+    let endingIndex:number|undefined = undefined;
     let startingX:number;
     let endingX:number;
 
@@ -150,7 +149,7 @@ export default class Waveform {
       } else if (startingIndex === 0) {
         ctx.fillRect(0, 0, startingX! + loopStartIdx * binWidth, ch);
       } else {
-        ctx.fillRect(0, 0, (loopStartIdx - startingIndex) * binWidth, ch);
+        ctx.fillRect(0, 0, cw/2 - (atIndex - loopStartIdx) * binWidth, ch);
       }
 
       if (!hasEnd) return;
@@ -161,7 +160,7 @@ export default class Waveform {
         const width = (cw - endingX!) + (endingIndex-loopEndIdx) * binWidth;
         ctx.fillRect(cw - width, 0, width, ch);
       } else {
-        const width = (endingIndex - loopEndIdx) * binWidth;
+        const width = cw/2 - (loopEndIdx - atIndex) * binWidth;
         ctx.fillRect(cw - width, 0, width, ch);
       }
     }

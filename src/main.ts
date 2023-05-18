@@ -20,7 +20,10 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
       <input id='ytUrl' type="url" placeholder="YouTube video URL"  />
       <button id="btn-play-yt" type="submit" class="play"><img id="play_icon" src="${playSvg}"/></button>
     </div>
-    <input id='${FILE_INPUT}' accept="audio/*,video/*,.lrc" type="file" style="margin:0.7em 0;width:96%">
+    <div class="input-file-container">
+      <input id='${FILE_INPUT}' accept="audio/*,video/*,.lrc" type="file" style="margin:0.7em 0;">
+      <p id='filename' style="float:right;font-size:0.8em;margin-right:1.2em"></p>
+    </div>
 
     <div class="media">
     <div id="youtube"></div>
@@ -37,7 +40,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
       </div>
       <button id="deleteLoop" class="play"><img class="delete-lyric" src='${trashSvg}'/></button>
       <input id="lyric-t" class="lyric-t" type="text" placeholder="..." value="this is insane"/>
-      <p id='lyric-p'></p>
+      <p id='lyric-p' class='lyric-p'></p>
       <button id="playLoop" class="play lyric-play"><img class="play-lyric" src="${playSvg}"/></button>
       <button id="nextLoop">﹀</button>
     </div>
@@ -139,7 +142,6 @@ class App {
 
   filename?: string = localStorage.getItem("filename") ?? undefined;
 
-  loopTimer?: number;
   loops: Loop[] = [];
   loopIndex = 0;
   currentLoop: Loop = {
@@ -147,7 +149,12 @@ class App {
     end: 0,
     content: "",
   }
-  waveform: Waveform;
+  private _waveform?: Waveform;
+  get waveform() {
+    if (!this._waveform)
+      this._waveform = new Waveform(document.getElementById("waveform") as HTMLCanvasElement);
+    return this._waveform;
+  }
 
   recordedAudio?: HTMLAudioElement;
   constructor() {
@@ -158,7 +165,7 @@ class App {
     this.setKeyInput();
     this.initState();
     this.retrieveLoops();
-    this.waveform = new Waveform(document.getElementById("waveform") as HTMLCanvasElement);
+    this.retrieveMedia();
 
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
       //Feature is not supported in browser
@@ -176,6 +183,7 @@ class App {
       document.getElementById("youtube")!.style.display = "inherit";
       if (this.ytPlayer) this.ytPlayer.src = this.ytUrl.value;
       this.activePlayer?.pause();
+      this.stopDrawing();
       this.stopLooping();
       this.activePlayer = this.ytPlayer;
       this.video.style.display = 'none';
@@ -221,7 +229,7 @@ class App {
     }
     this.btnCenter.onclick = () => {
       this.btnCenter.blur();
-      this.playPause();
+      this.pressPlayPause();
     }
     this.btnRight.onclick = () => {
       this.btnRight.blur();
@@ -318,6 +326,7 @@ class App {
 
     this.startDrawing = this.startDrawing.bind(this);
     this.stopDrawing = this.stopDrawing.bind(this);
+    this._startLooping = this._startLooping.bind(this);
     this.video.addEventListener('play', () => {
       this.stoppedDrawing = false;
       this.startDrawing();
@@ -326,13 +335,6 @@ class App {
       this.stoppedDrawing = false;
       this.startDrawing();
     })
-    this.video.addEventListener('pause', () => {
-      this.stopDrawing();
-    })
-    this.audio.addEventListener('pause', () => {
-      this.stopDrawing();
-    })
-
 
     this.video.onmousedown = eve => eve.preventDefault();
     this.audio.onmousedown = eve => eve.preventDefault();
@@ -344,7 +346,7 @@ class App {
       let file = this.inputFile.files?.[0];
       if (!file) return;
       let filename = file.name;
-      this.filename = filename.split('.').slice(0, -1).join('.');;
+      this.filename = filename.split('.').slice(0, -1).join('.');
       localStorage.setItem("filename", this.filename);
       let extension = filename.split('.').pop()?.toLowerCase();
       if (extension === "lrc") {
@@ -360,6 +362,12 @@ class App {
         return;
       }
 
+      if (file.size / 1000000 < 50) {
+        DB.saveMedia(file);
+      } else {
+        DB.removeMedia();
+      }
+      document.getElementById('filename')!.innerText = "";
       this.waveform.extract(this.inputFile.files![0]);
       this.video.src = URL.createObjectURL(this.inputFile.files![0]);
     });
@@ -440,9 +448,9 @@ class App {
         case 's': this.pressS(); break;
         case 'e': this.pressE(); break;
         case 'd': this.pressD(); break;
-        case ' ': this.playPause(); break;
-        case 'ArrowLeft': this.pressBtnLeft(e.metaKey); break;
-        case 'ArrowRight': this.pressBtnRight(e.metaKey); break;
+        case ' ': this.pressPlayPause(); break;
+        case 'ArrowLeft': this.pressBtnLeft(e.shiftKey); break;
+        case 'ArrowRight': this.pressBtnRight(e.shiftKey); break;
         case 'ArrowUp': this.pressBtnUp(); break;
         case 'ArrowDown': this.pressBtnDown(); break;
         case 'Enter': this.pressLoopPlay(); break;
@@ -459,6 +467,7 @@ class App {
     }
     this.activePlayer?.pause();
     this.stopLooping();
+    this.stopDrawing();
     if (this.video.duration > 0 && this.video.videoWidth === 0) {
       //audio
       this.audio.src = this.video.src;
@@ -530,6 +539,11 @@ class App {
 
   }
 
+  pressPlayPause() {
+    this.pressEffect(this.btnCenter) &&
+      this.playPause();
+  }
+
   pressBtnUp() {
     if (this.loops.length === 0) return;
     this.pressEffect(this.btnPrevLoop);
@@ -558,6 +572,7 @@ class App {
       content: "",
     }
     this.updateState(State.Looping);
+    this.audioBlob = undefined;
     if (this.recordedAudio && this.recordedAudio.paused) {
       if (this.activePlayer?.paused) {
         this.activePlayer.play();
@@ -578,24 +593,28 @@ class App {
   }
 
   playPause() {
-    if (this.isRecording) return;
-    if (!this.recordedAudio?.paused) {
-      this.recordedAudio?.pause();
-      return;
+    if (this.isRecording || !this.activePlayer) return;
+    if (this.recordedAudio) {
+      if (!this.recordedAudio.paused) {
+        this.recordedAudio.pause();
+        return;
+      } else if (this.audioBlob && this.activePlayer.currentTime >= this.currentLoop.end) {
+        this.recordedAudio.play();
+        return;
+      }
     }
 
-    if (this.activePlayer) {
-      if (document.activeElement === this.activePlayer) {
-        this.activePlayer.blur();
+    if (document.activeElement === this.activePlayer) {
+      this.activePlayer.blur();
+    }
+    if (this.activePlayer.paused) {
+      this.activePlayer.play();
+      if (this.state === State.Looping) {
+        this.startLooping();
       }
-      if (this.activePlayer.paused) {
-        this.activePlayer.play();
-        if (this.state === State.Looping) {
-          this.startLooping();
-        }
-      } else {
-        this.activePlayer.pause();
-      }
+    } else {
+      this.activePlayer.pause();
+      this.stopDrawing();
     }
   }
 
@@ -636,12 +655,24 @@ class App {
       this.updateLyricCard();
     });
   }
+
+  retrieveMedia() {
+    DB.retreiveMedia()
+      .then((blob) => {
+        this.waveform.extract(blob as File);
+        this.video.src = URL.createObjectURL(blob as File);
+        let filename = (blob as File).name;
+        this.filename = filename.split('.').slice(0, -1).join('.');
+        document.getElementById('filename')!.innerText = filename;
+      })
+  }
   /*** State */
   initState() {
     this.updateLyricCard();
 
     this.btnLeftMeta.setAttribute(DISABLED, 'true');
     this.btnLeft.setAttribute(DISABLED, 'true');
+    this.btnCenter.setAttribute(DISABLED, 'true');
     this.btnRightMeta.setAttribute(DISABLED, 'true');
     this.btnRight.setAttribute(DISABLED, 'true');
 
@@ -664,6 +695,7 @@ class App {
         break;
       case State.Loaded:
         switch (state) {
+          case State.Loaded: break;
           case State.A: this.updateToAState(); break;
           case State.Looping: this.updateToLoopState(); break;
           default: this.stError(state);
@@ -688,7 +720,7 @@ class App {
   }
 
   updateToLoaded() {
-    [this.btnLeft, this.btnLeftMeta, this.btnRight, this.btnRightMeta, this.btnA].forEach(b => {
+    [this.btnLeft, this.btnLeftMeta, this.btnCenter, this.btnRight, this.btnRightMeta, this.btnA].forEach(b => {
       b.removeAttribute(DISABLED);
     });
     this.btnA.textContent = "A";
@@ -704,7 +736,7 @@ class App {
 
   updateToLoopState() {
     this.btnB.setAttribute(DISABLED, 'true');
-    [this.btnA, this.btnS, this.btnR, this.btnLeft, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
+    [this.btnA, this.btnS, this.btnR, this.btnLeft, this.btnCenter, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
       .forEach(b => b.removeAttribute(DISABLED));
     this.btnA.textContent = "Abort";
   }
@@ -780,8 +812,8 @@ class App {
       case State.A:
         switch (op) {
           case Op.A: this.fireAOp(); break;
-          case Op.B: this.updateState(State.Looping); this.fireBOp(); this.isAutoRecord && this.fireROp(); break;
-          case Op.R: this.updateState(State.Looping); this.fireBOp(); this.fireROp(); break;
+          case Op.B: this.updateState(State.Looping); this.fireBOp(!this.isAutoRecord); this.isAutoRecord && this.fireROp(); break;
+          case Op.R: this.updateState(State.Looping); this.fireBOp(false); this.fireROp(); break;
           default: this.opError(op);
         }
         break;
@@ -805,22 +837,24 @@ class App {
     this.audioBlob = undefined;
   }
 
-  fireBOp() {
+  fireBOp(startLooping:boolean=true) {
     this.currentLoop.end = Math.round(this.activePlayer!.currentTime * 100000) / 100000;
-    this.startLooping();
+    startLooping && this.startLooping();
   }
 
   fireROp() {
     if (this.currentLoop.end - this.currentLoop.start < 0.5) return;
-
+    this.stopLooping();
     this.activePlayer!.pause();
     this.activePlayer!.currentTime = this.currentLoop.end;
+    this.stopDrawing();
     this.updateToRecording();
+    this.drawOneFrame(this.currentLoop.end);
     this.isRecording = true;
     this.recordAudio(() => {
       this.isRecording = false;
       this.updateToLoopState();
-      this.activePlayer!.play();
+      this.startPlayingRecording();
     })
   }
 
@@ -900,6 +934,7 @@ class App {
           recorder.addEventListener("stop", () => {
             this.audioBlob = new Blob(audioBlobs, { type: mimeType });
             this.recordedAudio!.src = URL.createObjectURL(this.audioBlob);
+            completion();
           }, { once: true });
           gsap.killTweensOf(this.animation);
           this.animation.value = 0;
@@ -907,7 +942,6 @@ class App {
           this.progress.style.width = '0%';
           recorder.stop();
           stream.getTracks().forEach(t => t.stop());
-          completion();
         }, duration);
       }).catch(error => {
         alert(`Error: ${error.message}`);
@@ -916,47 +950,65 @@ class App {
   }
 
   /** loop */
+  loopingId?: number;
+  stoppedLooping = false;
   startLooping() {
-    this.stopLooping();
-    if (!this.activePlayer) return;
-    this.loopTimer = setInterval(() => {
-      if (!this.activePlayer?.paused && this.activePlayer && this.activePlayer.currentTime >= this.currentLoop.end) {
-        this.activePlayer.currentTime = this.currentLoop.start;
-        if (this.audioBlob) {
-          //play recording
-          this.activePlayer.pause();
+    this.stoppedLooping = false;
+    this._startLooping();
+  }
 
-          if (this.recordedAudio) this.recordedAudio.currentTime = 0;
-          this.recordedAudio?.play();
-
-          this.recordedAudio?.addEventListener("ended", () => {
-            this.activePlayer!.play();
-          }, { once: true });
-
-        }
-      } else if (this.activePlayer && this.activePlayer.currentTime < this.currentLoop.start) {
+  _startLooping() {
+    if (this.activePlayer && !this.activePlayer.paused && this.activePlayer.currentTime >= this.currentLoop.end) {
+      if (this.audioBlob && this.recordedAudio) {
+        this.stopLooping();
+        this.activePlayer.pause();
+        this.activePlayer.currentTime = this.currentLoop.end;
+        this.stopDrawing();
+        this.startPlayingRecording();
+      } else {
         this.activePlayer.currentTime = this.currentLoop.start;
       }
-    }, 50);
+    } else if (this.activePlayer && this.activePlayer.currentTime < this.currentLoop.start) {
+      this.activePlayer.currentTime = this.currentLoop.start;
+    }
+    if (!this.stoppedLooping) this.loopingId = requestAnimationFrame(this._startLooping);
+  }
+
+  startPlayingRecording() {
+    if (this.recordedAudio) this.recordedAudio.currentTime = 0;
+    this.recordedAudio?.play();
+
+    this.recordedAudio?.addEventListener("ended", () => {
+      if (this.activePlayer) {
+        this.activePlayer.currentTime = this.currentLoop.start;
+        this.activePlayer.play();
+        this.startLooping();
+      }
+    }, { once: true });
   }
 
   stopLooping() {
-    clearInterval(this.loopTimer);
+    this.loopingId && cancelAnimationFrame(this.loopingId);
+    this.loopingId = undefined;
+    this.stoppedLooping = true;
   }
 
   animationId?: number;
   stoppedDrawing = false;
   startDrawing() {
-    const loop = (this.state === State.Looping || this.state === State.A) ? this.currentLoop : undefined;
-    if (!this.audio.paused) {
-      this.waveform.draw(this.audio.currentTime, loop, this.state !== State.A);
-    } else if (!this.video.paused) {
-      this.waveform.draw(this.video.currentTime, loop, this.state !== State.A);
-    }
+    this.drawOneFrame();
     if (!this.stoppedDrawing) this.animationId = requestAnimationFrame(this.startDrawing);
   }
 
+  drawOneFrame(time?: number) {
+    if (this.activePlayer && this.activePlayer !== this.ytPlayer) {
+      const loop = (this.state === State.Looping || this.state === State.A) ? this.currentLoop : undefined;
+      this.waveform.draw(time ?? this.activePlayer.currentTime, loop, this.state != State.A);
+    }
+  }
+
   stopDrawing() {
+    this.drawOneFrame();
     this.animationId && cancelAnimationFrame(this.animationId);
     this.animationId = undefined;
     this.stoppedDrawing = true;

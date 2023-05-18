@@ -24,8 +24,7 @@ export default class YTPlayerAdaptor {
     this.ytPlayer = new this.YT.Player("youtube", {
       videoId: vid,
       events: {
-        "onStateChange": (e: any) => {
-          console.log("state", e);
+        "onStateChange": () => {
         },
         "onError": (e: any) => {
           console.log("youtube load error", e);
