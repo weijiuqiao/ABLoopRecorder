@@ -159,7 +159,7 @@ class App {
   recordedAudio?: HTMLAudioElement;
   constructor() {
     this.setAutoRecord(this.isAutoRecord);
-    // this.loadYTPlayer();
+    this.loadYTPlayer();
     this.setOnclicks();
     this.setEvents();
     this.setKeyInput();
@@ -467,7 +467,6 @@ class App {
     }
     this.activePlayer?.pause();
     this.stopLooping();
-    this.stopDrawing();
     if (this.video.duration > 0 && this.video.videoWidth === 0) {
       //audio
       this.audio.src = this.video.src;
@@ -480,6 +479,7 @@ class App {
       this.activePlayer = this.video;
     }
     this.updateState(State.Loaded);
+    this.stopDrawing();
     this.inputFile.blur();
   }
 

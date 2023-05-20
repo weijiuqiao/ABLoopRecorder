@@ -5,7 +5,7 @@ const scaleFactor = window.devicePixelRatio;
 export default class Waveform {
   static interval = 0.02; // interval in seconds
   canvas: HTMLCanvasElement;
-  ctx = new AudioContext();
+  ctx?:AudioContext;
   amplitudes: number[] = [];
   amplitudes2: number[] = [];
   numberOfChannels = 1;
@@ -31,6 +31,9 @@ export default class Waveform {
     reader.onload = () => {
       const data = reader.result;
       try {
+        if (!this.ctx) {
+          this.ctx = new AudioContext();
+        }
         this.ctx.decodeAudioData(data as any)
           .then((buffer) => {
             this.numberOfChannels = Math.min(buffer.numberOfChannels, 2);
@@ -52,6 +55,7 @@ export default class Waveform {
                   this.amplitudes2.push(averageAmplitude);
                 }
               }
+              this.draw(0);
             }
           })
       } catch (e) {

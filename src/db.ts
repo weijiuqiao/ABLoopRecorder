@@ -18,8 +18,13 @@ request.onupgradeneeded = event => {
     db.createObjectStore(mediaStoreName);
 };
 
+let queues: (() => void)[] = [];
 request.onsuccess = event => {
   db = (event.target as any).result;
+  queues.forEach(cb => {
+    cb();
+  })
+  queues.length = 0;
   console.log("successfully loaded DB");
 };
 
@@ -97,31 +102,46 @@ export function deleteSaveLoop(start: number, loop: Loop) {
 }
 
 export function retrieveLoops(completion: (loops: Loop[]) => void) {
-  const transaction = db.transaction(storeName, 'readwrite');
-  const store = transaction.objectStore(storeName);
-  // Retrieve all objects from the store
-  const getAllRequest = store.getAll();
-  getAllRequest.onsuccess = (event: any) => {
-    completion(event.target.result);
-  };
-  getAllRequest.onerror = (e: any) => {
-    console.error(e);
-    completion([]);
+  const retrieve = () => {
+    const transaction = db.transaction(storeName, 'readwrite');
+    const store = transaction.objectStore(storeName);
+    // Retrieve all objects from the store
+    const getAllRequest = store.getAll();
+    getAllRequest.onsuccess = (event: any) => {
+      completion(event.target.result);
+    };
+    getAllRequest.onerror = (e: any) => {
+      console.error(e);
+      completion([]);
+    };
+  }
+
+  if (!db) {
+    queues.push(retrieve);
+  } else {
+    retrieve();
   }
 }
 
 export function retreiveMedia() {
   return new Promise((resolve) => {
-    const transaction = db.transaction(mediaStoreName, 'readwrite');
-    const store = transaction.objectStore(mediaStoreName);
+    const callback = ()=>{
+      const transaction = db.transaction(mediaStoreName, 'readwrite');
+      const store = transaction.objectStore(mediaStoreName);
 
-    const request = store.get(mediaStoreKey);
-    request.onsuccess = (e:any) => {
-      const blob = e.target.result;
-      resolve(blob);
-    }
-    request.onerror = (e: any) => {
-      console.error(e);
+      const request = store.get(mediaStoreKey);
+      request.onsuccess = (e: any) => {
+        const blob = e.target.result;
+        resolve(blob);
+      }
+      request.onerror = (e: any) => {
+        console.error(e);
+      }
+    };
+    if (!db) {
+      queues.push(callback);
+    } else {
+      callback();
     }
   })
 }
