@@ -7,6 +7,8 @@ import gsap from 'gsap';
 import { Loop, generateLrc } from './lyrcs';
 // @ts-ignore
 import parseLrc from 'parse.lrc';
+// @ts-ignore
+import LocaleConfig from './localizations'
 
 import Waveform from './Waveform';
 import * as DB from './db';
@@ -15,7 +17,7 @@ const FILE_INPUT = 'file_input';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
   <div id="container">
-    <h2>AB Loop Recorder</h2>
+    <h2 id="page-title">AB Loop Recorder</h2>
     <div id="youtube-url">
       <input id='ytUrl' type="url" placeholder="YouTube video URL"  />
       <button id="btn-play-yt" type="submit" class="play"><img id="play_icon" src="${playSvg}"/></button>
@@ -67,7 +69,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
     </div>
 
     <p class="read-the-docs">
-    ↑: previous loop. ↓: next loop. ⏎: play loop. ⌫: delete loop(long press to purge).
+    ↑: previous loop. ↓: next loop. ⏎: play loop. ⌫: delete loop(long press trash icon to purge).
     <br/>All info stays locally on your computer. No data will be uploaded.
     <br/>Chrome or Firefox recommended. Source code at <a href="https://github.com/weijiuqiao/ABLoopRecorder">Github</a>.
     </p>
@@ -166,13 +168,16 @@ class App {
     this.initState();
     this.retrieveLoops();
     this.retrieveMedia();
+    this.localize();
 
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
       this.canRecord = false;
       this.setAutoRecord(false);
       this.btnAutoRecord.setAttribute(DISABLED, 'true');
       this.isAutoRecord = false;
-      alert("Recording feature is not supported by browser.")
+      setTimeout(() => {
+        alert(LocaleConfig[navigator.language]?.recordingUnSupported ?? "Recording feature not supported by browser.")
+      }, 600);
     } else {
       this.recordedAudio = new Audio();
     }
@@ -183,13 +188,14 @@ class App {
       this.btnPlayYT.blur();
       document.getElementById("youtube")!.style.display = "inherit";
       if (this.ytPlayer) this.ytPlayer.src = this.ytUrl.value;
-      this.activePlayer?.pause();
-      this.stopDrawing();
+      this.pause();
       this.stopLooping();
       this.activePlayer = this.ytPlayer;
       this.video.style.display = 'none';
       this.audio.style.display = 'none';
       document.getElementById('waveform')!.style.height = '0';
+      document.getElementById('filename')!.innerText = '';
+      this.filename = "YouTube_video";
       this.updateState(State.Loaded);
     }
     this.btnA.onclick = () => {
@@ -328,14 +334,6 @@ class App {
     this.startDrawing = this.startDrawing.bind(this);
     this.stopDrawing = this.stopDrawing.bind(this);
     this._startLooping = this._startLooping.bind(this);
-    this.video.addEventListener('play', () => {
-      this.stoppedDrawing = false;
-      this.startDrawing();
-    })
-    this.audio.addEventListener('play', () => {
-      this.stoppedDrawing = false;
-      this.startDrawing();
-    })
 
     this.video.onmousedown = eve => eve.preventDefault();
     this.audio.onmousedown = eve => eve.preventDefault();
@@ -466,7 +464,7 @@ class App {
       yt.style.display = 'none';
       document.getElementById('waveform')!.style.height = '';
     }
-    this.activePlayer?.pause();
+    this.pause();
     this.stopLooping();
     if (this.video.duration > 0 && this.video.videoWidth === 0) {
       //audio
@@ -480,12 +478,12 @@ class App {
       this.activePlayer = this.video;
     }
     this.updateState(State.Loaded);
-    this.stopDrawing();
+    // this.stopDrawing();
     this.inputFile.blur();
   }
 
   onLoadError(e: any) {
-    alert(`Cannot play media at: ${e.srcElement.currentSrc}`);
+    alert((LocaleConfig[navigator.language]?.cannotPlayMedia ?? 'Cannot play media at:') + ` ${e.srcElement.currentSrc}`);
     this.activePlayer = undefined;
   }
 
@@ -576,11 +574,11 @@ class App {
     this.audioBlob = undefined;
     if (this.recordedAudio && this.recordedAudio.paused) {
       if (this.activePlayer?.paused) {
-        this.activePlayer.play();
+        this.play();
       }
     } else if (!this.recordedAudio) {
       if (this.activePlayer?.paused) {
-        this.activePlayer.play();
+        this.play();
       }
     }
     this.startLooping();
@@ -609,13 +607,12 @@ class App {
       this.activePlayer.blur();
     }
     if (this.activePlayer.paused) {
-      this.activePlayer.play();
+      this.play();
       if (this.state === State.Looping) {
         this.startLooping();
       }
     } else {
-      this.activePlayer.pause();
-      this.stopDrawing();
+      this.pause()
     }
   }
 
@@ -629,8 +626,27 @@ class App {
     if (this.state === State.Looping) {
       this.activePlayer!.currentTime = Math.min(this.currentLoop.end, Math.max(this.currentLoop.start, this.activePlayer!.currentTime))
     }
+    this.drawOneFrame({ animate: true });
   }
 
+  get YTactive() {
+    return this.activePlayer === this.ytPlayer;
+  }
+
+  play() {
+    this.activePlayer?.play();
+    if (!this.YTactive && this.activePlayer) {
+      this.stoppedDrawing = false;
+      this.startDrawing();
+    }
+  }
+
+  pause() {
+    this.activePlayer?.pause();
+    if (!this.YTactive && this.activePlayer) {
+      this.stopDrawing();
+    }
+  }
 
   insertLrc(lrc: any) {
     if (this.loops.length === 0 || confirm("Replace saved loops?")) {
@@ -678,7 +694,7 @@ class App {
     this.btnRightMeta.setAttribute(DISABLED, 'true');
     this.btnRight.setAttribute(DISABLED, 'true');
 
-    [this.btnA, this.btnB, this.btnR, this.btnS, this.btnE, this.btnD].forEach((b) => {
+    [this.btnA, this.btnB, this.btnR, this.btnS].forEach((b) => {
       b.setAttribute(DISABLED, 'true');
     })
   }
@@ -755,12 +771,15 @@ class App {
       this.cardLyrics.style.visibility = "visible";
       this.cardLyrics.style.height = 'auto';
       this.cardLyrics.style.margin = '1em 0 0.5em 0';
-      this.btnD.removeAttribute(DISABLED);
-      this.btnE.removeAttribute(DISABLED);
     } else if (this.loops.length === 0 && this.cardLyrics.style.visibility !== "hidden") {
       this.cardLyrics.style.visibility = "hidden";
       this.cardLyrics.style.height = '0';
       this.cardLyrics.style.margin = '0';
+    }
+    if (this.loops.length > 0) {
+      this.btnD.removeAttribute(DISABLED);
+      this.btnE.removeAttribute(DISABLED);
+    } else {
       this.btnD.setAttribute(DISABLED, "true");
       this.btnE.setAttribute(DISABLED, "true");
     }
@@ -822,7 +841,7 @@ class App {
         break;
       case State.Looping:
         switch (op) {
-          case Op.A: this.stopLooping(); this.updateState(State.Loaded); break;
+          case Op.A: this.stopLooping(); this.updateState(State.Loaded); this.abortAB(); break;
           case Op.R: this.fireROp(); break;
           case Op.S: this.fireSOp(); break;
           case Op.E: this.fireEOp(); break;
@@ -835,12 +854,12 @@ class App {
   }
 
   fireAOp() {
-    this.activePlayer!.play();
+    this.play()
     this.currentLoop.start = Math.round(this.activePlayer!.currentTime * 100000) / 100000;
     this.audioBlob = undefined;
   }
 
-  fireBOp(startLooping:boolean=true) {
+  fireBOp(startLooping: boolean = true) {
     this.currentLoop.end = Math.round(this.activePlayer!.currentTime * 100000) / 100000;
     startLooping && this.startLooping();
   }
@@ -848,11 +867,10 @@ class App {
   fireROp() {
     if (this.currentLoop.end - this.currentLoop.start < 0.5) return;
     this.stopLooping();
-    this.activePlayer!.pause();
     this.activePlayer!.currentTime = this.currentLoop.end;
-    this.stopDrawing();
+    this.pause();
     this.updateToRecording();
-    this.drawOneFrame(this.currentLoop.end);
+    this.drawOneFrame({ time: this.currentLoop.end });
     this.isRecording = true;
     this.recordAudio(() => {
       this.isRecording = false;
@@ -895,6 +913,11 @@ class App {
     setTimeout(() => {
       this.lyricText.focus();
     }, 500);
+  }
+
+  abortAB() {
+    this.audioBlob = undefined;
+    this.drawOneFrame();
   }
 
   audioBlob?: Blob;
@@ -947,7 +970,7 @@ class App {
           stream.getTracks().forEach(t => t.stop());
         }, duration);
       }).catch(error => {
-        alert(`Error: ${error.message}`);
+        alert((LocaleConfig[navigator.language]?.error ?? 'Error:') + ` ${error.message}`);
         completion();
       })
   }
@@ -964,9 +987,8 @@ class App {
     if (this.activePlayer && !this.activePlayer.paused && this.activePlayer.currentTime >= this.currentLoop.end) {
       if (this.audioBlob && this.recordedAudio) {
         this.stopLooping();
-        this.activePlayer.pause();
         this.activePlayer.currentTime = this.currentLoop.end;
-        this.stopDrawing();
+        this.pause();
         this.startPlayingRecording();
       } else {
         this.activePlayer.currentTime = this.currentLoop.start;
@@ -983,9 +1005,13 @@ class App {
 
     this.recordedAudio?.addEventListener("ended", () => {
       if (this.activePlayer) {
-        this.activePlayer.currentTime = this.currentLoop.start;
-        this.activePlayer.play();
-        this.startLooping();
+        if (this.state === State.Looping) {
+          this.activePlayer.currentTime = this.currentLoop.start;
+          this.play();
+          this.startLooping();
+        } else if (!this.isRecording) {
+          this.play();
+        }
       }
     }, { once: true });
   }
@@ -999,14 +1025,20 @@ class App {
   animationId?: number;
   stoppedDrawing = false;
   startDrawing() {
-    this.drawOneFrame();
+    this.drawOneFrame({ forceStop: this.state === State.A });
     if (!this.stoppedDrawing) this.animationId = requestAnimationFrame(this.startDrawing);
   }
 
-  drawOneFrame(time?: number) {
+  drawOneFrame(pr: { time?: number, animate?: boolean, forceStop?: boolean } = {}) {
     if (this.activePlayer && this.activePlayer !== this.ytPlayer) {
       const loop = (this.state === State.Looping || this.state === State.A) ? this.currentLoop : undefined;
-      this.waveform.draw(time ?? this.activePlayer.currentTime, loop, this.state != State.A);
+      this.waveform.draw({
+        at: pr.time ?? this.activePlayer.currentTime,
+        loop,
+        hasEnd: this.state !== State.A,
+        animate: pr.animate,
+        forceStop: pr.forceStop,
+      });
     }
   }
 
@@ -1015,6 +1047,22 @@ class App {
     this.animationId && cancelAnimationFrame(this.animationId);
     this.animationId = undefined;
     this.stoppedDrawing = true;
+  }
+
+  /** localization */
+  localize() {
+    const cfg = LocaleConfig[navigator.language];
+    if (!cfg) return;
+    document.documentElement.lang = navigator.language;
+    if (cfg.title) document.getElementById("page-title")!.innerText = cfg.title;
+    if (cfg.ytUrlPlaceholder) this.ytUrl.placeholder = cfg.ytUrlPlaceholder;
+    if (cfg.btnR) this.btnR.innerHTML = cfg.btnR;
+    if (cfg.btnAutoRecord) this.btnAutoRecord.innerHTML = cfg.btnAutoRecord;
+    if (cfg.btnS) this.btnS.innerHTML = cfg.btnS;
+    if (cfg.btnE) this.btnE.innerHTML = cfg.btnE;
+    if (cfg.btnD) this.btnD.innerHTML = cfg.btnD;
+    if (cfg.docs) document.getElementsByClassName("read-the-docs")[0].innerHTML = cfg.docs;
+
   }
 
 }

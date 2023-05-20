@@ -5,7 +5,7 @@ const scaleFactor = window.devicePixelRatio;
 export default class Waveform {
   static interval = 0.02; // interval in seconds
   canvas: HTMLCanvasElement;
-  ctx?:AudioContext;
+  ctx?: AudioContext;
   amplitudes: number[] = [];
   amplitudes2: number[] = [];
   numberOfChannels = 1;
@@ -22,6 +22,7 @@ export default class Waveform {
 
     this.canvasCtx = this.canvas.getContext('2d') ?? undefined;
     this.canvasCtx?.scale(scaleFactor, scaleFactor);
+    this.startAnimation = this.startAnimation.bind(this);
   }
 
   extract(file: File) {
@@ -55,7 +56,7 @@ export default class Waveform {
                   this.amplitudes2.push(averageAmplitude);
                 }
               }
-              this.draw(0);
+              this.draw({at: 0});
             }
           })
       } catch (e) {
@@ -70,7 +71,63 @@ export default class Waveform {
    * @param at second
    * @returns
    */
-  draw(at: number, loop?: Loop, hasEnd?:boolean) {
+  lastAt = 0;
+  targetAt: number = 0;
+  loop?: Loop;
+  hasEnd?: boolean;
+
+  animateId?: number;
+  stoppedAnimation = false;
+  draw(pr:{at: number, loop?: Loop, hasEnd?: boolean, animate?: boolean, forceStop?:boolean}) {
+    const animationFrameCount = 10
+    if (pr.animate) {
+      if (this.animateId !== undefined) cancelAnimationFrame(this.animateId);
+      this.animateId = undefined;
+      this.stoppedAnimation = true;
+
+      this.targetAt = pr.at;
+      this.stoppedAnimation = false;
+      this.loop = pr.loop;
+      this.hasEnd = pr.hasEnd;
+
+      this.step = (this.targetAt - this.lastAt) / animationFrameCount; // 6 is frame count
+      this.startAnimation();
+
+    } else if (!pr.forceStop) {
+      if (this.animateId !== undefined) {
+        this.targetAt = pr.at;
+        this.loop = pr.loop;
+        this.hasEnd = pr.hasEnd;
+        this.step = (this.targetAt - this.lastAt) / (pr.animate?animationFrameCount:3);
+      } else {
+        this._draw(pr.at, pr.loop, pr.hasEnd);
+      }
+    } else {
+      if (this.animateId !== undefined) {
+        cancelAnimationFrame(this.animateId);
+        this.animateId = undefined;
+        this.stoppedAnimation = true;
+      }
+      this._draw(pr.at, pr.loop, pr.hasEnd);
+    }
+  }
+
+  step = 0;
+  startAnimation() {
+    let at;
+    if (Math.abs(this.targetAt - this.lastAt) <= Math.abs(this.step) * 1.2) {
+      at = this.targetAt;
+      this.stoppedAnimation = true;
+      this.animateId = undefined;
+    } else {
+      at = this.lastAt + this.step;
+    }
+    this.step *= 0.9;
+    this._draw(at, this.loop, this.hasEnd);
+    if (!this.stoppedAnimation) this.animateId = requestAnimationFrame(this.startAnimation);
+  }
+
+  _draw(at: number, loop?: Loop, hasEnd?: boolean) {
     const ctx = this.canvasCtx;
     if (!ctx) return;
     ctx.fillStyle = '#646cff';
@@ -89,10 +146,10 @@ export default class Waveform {
     const index = Math.floor(atIndex);
     const offsetLeft = -(atIndex - index) * binWidth;
 
-    let startingIndex:number|undefined = undefined;
-    let endingIndex:number|undefined = undefined;
-    let startingX:number;
-    let endingX:number;
+    let startingIndex: number | undefined = undefined;
+    let endingIndex: number | undefined = undefined;
+    let startingX: number;
+    let endingX: number;
 
     const mono = this.numberOfChannels === 1;
     const multiplier = 2;
@@ -153,21 +210,22 @@ export default class Waveform {
       } else if (startingIndex === 0) {
         ctx.fillRect(0, 0, startingX! + loopStartIdx * binWidth, ch);
       } else {
-        ctx.fillRect(0, 0, cw/2 - (atIndex - loopStartIdx) * binWidth, ch);
+        ctx.fillRect(0, 0, cw / 2 - (atIndex - loopStartIdx) * binWidth, ch);
       }
 
       if (!hasEnd) return;
 
       const loopEndIdx = loop.end / Waveform.interval;
       if (loopEndIdx > endingIndex) {
-      } else if (endingIndex === this.amplitudes.length-1) {
-        const width = (cw - endingX!) + (endingIndex-loopEndIdx) * binWidth;
+      } else if (endingIndex === this.amplitudes.length - 1) {
+        const width = (cw - endingX!) + (endingIndex - loopEndIdx) * binWidth;
         ctx.fillRect(cw - width, 0, width, ch);
       } else {
-        const width = cw/2 - (loopEndIdx - atIndex) * binWidth;
+        const width = cw / 2 - (loopEndIdx - atIndex) * binWidth;
         ctx.fillRect(cw - width, 0, width, ch);
       }
     }
+    this.lastAt = at;
 
   }
 
