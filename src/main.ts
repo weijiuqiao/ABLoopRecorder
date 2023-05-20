@@ -168,10 +168,11 @@ class App {
     this.retrieveMedia();
 
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
-      //Feature is not supported in browser
       this.canRecord = false;
+      this.setAutoRecord(false);
       this.btnAutoRecord.setAttribute(DISABLED, 'true');
       this.isAutoRecord = false;
+      alert("Recording feature is not supported by browser.")
     } else {
       this.recordedAudio = new Audio();
     }
@@ -594,11 +595,11 @@ class App {
 
   playPause() {
     if (this.isRecording || !this.activePlayer) return;
-    if (this.recordedAudio) {
+    if (this.audioBlob && this.recordedAudio) {
       if (!this.recordedAudio.paused) {
         this.recordedAudio.pause();
         return;
-      } else if (this.audioBlob && this.activePlayer.currentTime >= this.currentLoop.end) {
+      } else if (this.activePlayer.currentTime >= this.currentLoop.end) {
         this.recordedAudio.play();
         return;
       }
@@ -659,6 +660,7 @@ class App {
   retrieveMedia() {
     DB.retreiveMedia()
       .then((blob) => {
+        if (!blob) return;
         this.waveform.extract(blob as File);
         this.video.src = URL.createObjectURL(blob as File);
         let filename = (blob as File).name;
@@ -736,8 +738,9 @@ class App {
 
   updateToLoopState() {
     this.btnB.setAttribute(DISABLED, 'true');
-    [this.btnA, this.btnS, this.btnR, this.btnLeft, this.btnCenter, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
+    [this.btnA, this.btnS, this.btnLeft, this.btnCenter, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
       .forEach(b => b.removeAttribute(DISABLED));
+    this.canRecord && this.btnR.removeAttribute(DISABLED);
     this.btnA.textContent = "Abort";
   }
 
