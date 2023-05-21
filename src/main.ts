@@ -756,7 +756,7 @@ class App {
     [this.btnA, this.btnS, this.btnLeft, this.btnCenter, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
       .forEach(b => b.removeAttribute(DISABLED));
     this.canRecord && this.btnR.removeAttribute(DISABLED);
-    this.btnA.textContent = "Abort";
+    this.btnA.textContent = this.abortText;
   }
 
   updateToRecording() {
@@ -1052,6 +1052,7 @@ class App {
   recordingUnSupported = "Recording feature not supported by browser.";
   cannotPlayMediaAt = "Cannot play media at:";
   errorAlert = "Error:"
+  abortText = 'Abort';
   localize() {
     const cfg = LocaleConfig[navigator.language.toLowerCase()];
     if (!cfg) return;
@@ -1070,7 +1071,7 @@ class App {
     if (cfg.recordingUnSupported) this.recordingUnSupported = cfg.recordingUnSupported;
     if (cfg.cannotPlayMediaAt) this.cannotPlayMediaAt = cfg.cannotPlayMediaAt;
     if (cfg.error) this.errorAlert = cfg.error;
-
+    if (cfg.abort) this.abortText = cfg.abort;
   }
 
 }

@@ -9,7 +9,8 @@ export type Config = {
   docs?: string
   recordingUnSupported?: string,
   cannotPlayMediaAt?: string,
-  error?: string
+  error?: string,
+  abort?: string,
 }
 
 /**
@@ -22,6 +23,7 @@ const config: { [key: string]: Config } = {
     recordingUnSupported: '该浏览器不支持录音功能',
     cannotPlayMediaAt: '无法播放：',
     error: '错误：',
+    abort: '退出(A)',
     btnR: '录音(R)',
     btnAutoRecord: '自动录音',
     btnS: '保留片段(S)',
