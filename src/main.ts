@@ -1056,7 +1056,10 @@ class App {
     const cfg = LocaleConfig[navigator.language.toLowerCase()];
     if (!cfg) return;
     document.documentElement.lang = navigator.language;
-    if (cfg.title) document.getElementById("page-title")!.innerText = cfg.title;
+    if (cfg.title) {
+      document.getElementById("page-title")!.innerText = cfg.title;
+      document.title = cfg.title;
+    }
     if (cfg.ytUrlPlaceholder) this.ytUrl.placeholder = cfg.ytUrlPlaceholder;
     if (cfg.btnR) this.btnR.innerHTML = cfg.btnR;
     if (cfg.btnAutoRecord) this.btnAutoRecord.innerHTML = cfg.btnAutoRecord;
