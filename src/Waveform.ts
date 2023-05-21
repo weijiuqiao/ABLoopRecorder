@@ -31,12 +31,12 @@ export default class Waveform {
     const reader = new FileReader();
     reader.onload = () => {
       const data = reader.result;
-      try {
+
         if (!this.ctx) {
-          this.ctx = new AudioContext();
+          const AudioContexty = window.AudioContext || (window as any).webkitAudioContext;
+          this.ctx = new AudioContexty();
         }
-        this.ctx.decodeAudioData(data as any)
-          .then((buffer) => {
+        this.ctx.decodeAudioData(data as any, (buffer)=> {
             this.numberOfChannels = Math.min(buffer.numberOfChannels, 2);
             for (let channel = 0; channel < this.numberOfChannels; channel++) {
               const channelData = buffer.getChannelData(channel);
@@ -58,11 +58,11 @@ export default class Waveform {
               }
               this.draw({at: 0});
             }
+          }, (e) => {
+            console.error('Decode audio data error: ', e);
           })
-      } catch (e) {
-        console.error('Decode audio data', e);
       }
-    }
+
     reader.readAsArrayBuffer(file);
   }
 

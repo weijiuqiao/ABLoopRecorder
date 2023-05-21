@@ -8,16 +8,19 @@ export type Config = {
   btnD?: string
   docs?: string
   recordingUnSupported?: string,
-  cannotPlayMedia?: string,
+  cannotPlayMediaAt?: string,
   error?: string
 }
 
+/**
+ * key needs to be in lower-case
+ */
 const config: { [key: string]: Config } = {
-  'zh-CN': {
+  'zh-cn': {
     title: '久违 AB 复读机',
     ytUrlPlaceholder: 'YouTube 视频链接',
     recordingUnSupported: '该浏览器不支持录音功能',
-    cannotPlayMedia: '无法播放：',
+    cannotPlayMediaAt: '无法播放：',
     error: '错误：',
     btnR: '录音(R)',
     btnAutoRecord: '自动录音',

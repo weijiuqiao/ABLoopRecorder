@@ -161,7 +161,7 @@ class App {
   recordedAudio?: HTMLAudioElement;
   constructor() {
     this.setAutoRecord(this.isAutoRecord);
-    this.loadYTPlayer();
+    // this.loadYTPlayer();
     this.setOnclicks();
     this.setEvents();
     this.setKeyInput();
@@ -170,13 +170,13 @@ class App {
     this.retrieveMedia();
     this.localize();
 
-    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || typeof MediaRecorder === 'undefined') {
       this.canRecord = false;
       this.setAutoRecord(false);
       this.btnAutoRecord.setAttribute(DISABLED, 'true');
       this.isAutoRecord = false;
       setTimeout(() => {
-        alert(LocaleConfig[navigator.language]?.recordingUnSupported ?? "Recording feature not supported by browser.")
+        alert(this.recordingUnSupported)
       }, 600);
     } else {
       this.recordedAudio = new Audio();
@@ -327,7 +327,7 @@ class App {
   setEvents() {
     this.onMediaLoaded = this.onMediaLoaded.bind(this);
     this.onLoadError = this.onLoadError.bind(this);
-    this.video.addEventListener("loadeddata", this.onMediaLoaded);
+    this.video.addEventListener("progress", this.onMediaLoaded);
     this.video.addEventListener("error", this.onLoadError);
     this.audio.addEventListener("error", this.onLoadError);
 
@@ -478,12 +478,11 @@ class App {
       this.activePlayer = this.video;
     }
     this.updateState(State.Loaded);
-    // this.stopDrawing();
     this.inputFile.blur();
   }
 
   onLoadError(e: any) {
-    alert((LocaleConfig[navigator.language]?.cannotPlayMedia ?? 'Cannot play media at:') + ` ${e.srcElement.currentSrc}`);
+    alert(this.cannotPlayMediaAt + ` ${e.srcElement.currentSrc}`);
     this.activePlayer = undefined;
   }
 
@@ -970,7 +969,7 @@ class App {
           stream.getTracks().forEach(t => t.stop());
         }, duration);
       }).catch(error => {
-        alert((LocaleConfig[navigator.language]?.error ?? 'Error:') + ` ${error.message}`);
+        alert(this.errorAlert + ` ${error.message}`);
         completion();
       })
   }
@@ -1050,8 +1049,11 @@ class App {
   }
 
   /** localization */
+  recordingUnSupported = "Recording feature not supported by browser.";
+  cannotPlayMediaAt = "Cannot play media at:";
+  errorAlert = "Error:"
   localize() {
-    const cfg = LocaleConfig[navigator.language];
+    const cfg = LocaleConfig[navigator.language.toLowerCase()];
     if (!cfg) return;
     document.documentElement.lang = navigator.language;
     if (cfg.title) document.getElementById("page-title")!.innerText = cfg.title;
@@ -1062,6 +1064,9 @@ class App {
     if (cfg.btnE) this.btnE.innerHTML = cfg.btnE;
     if (cfg.btnD) this.btnD.innerHTML = cfg.btnD;
     if (cfg.docs) document.getElementsByClassName("read-the-docs")[0].innerHTML = cfg.docs;
+    if (cfg.recordingUnSupported) this.recordingUnSupported = cfg.recordingUnSupported;
+    if (cfg.cannotPlayMediaAt) this.cannotPlayMediaAt = cfg.cannotPlayMediaAt;
+    if (cfg.error) this.errorAlert = cfg.error;
 
   }
 
