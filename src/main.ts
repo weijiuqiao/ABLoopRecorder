@@ -161,7 +161,7 @@ class App {
   recordedAudio?: HTMLAudioElement;
   constructor() {
     this.setAutoRecord(this.isAutoRecord);
-    // this.loadYTPlayer();
+    this.loadYTPlayer();
     this.setOnclicks();
     this.setEvents();
     this.setKeyInput();
@@ -334,6 +334,21 @@ class App {
     this.startDrawing = this.startDrawing.bind(this);
     this.stopDrawing = this.stopDrawing.bind(this);
     this._startLooping = this._startLooping.bind(this);
+
+    this.video.addEventListener('play', () => {
+      this.stoppedDrawing = false;
+      this.startDrawing();
+    })
+    this.audio.addEventListener('play', () => {
+      this.stoppedDrawing = false;
+      this.startDrawing();
+    })
+    this.video.addEventListener('pause', () => {
+      this.stopDrawing();
+    })
+    this.audio.addEventListener('pause', () => {
+      this.stopDrawing();
+    })
 
     this.video.onmousedown = eve => eve.preventDefault();
     this.audio.onmousedown = eve => eve.preventDefault();
