@@ -7,7 +7,6 @@ import gsap from 'gsap';
 import { Loop, generateLrc } from './lyrcs';
 // @ts-ignore
 import parseLrc from 'parse.lrc';
-// @ts-ignore
 import LocaleConfig from './localizations'
 
 import Waveform from './Waveform';
@@ -29,13 +28,13 @@ const btnEHtml = cfg?.btnE ?? '<u>E</u>dit loop';
 const btnDHtml = cfg?.btnD ?? '<u>D</u>ownload lyrics';
 const btnRHtml = cfg?.btnR ?? '<u>R</u>ecord';
 const btnAutoRecordHtml = cfg?.btnAutoRecord ?? "Auto record";
-const docsHtml = cfg?.docs ?? `↑: previous loop. ↓: next loop. ⏎: play loop. ⌫: delete loop(long press trash icon to purge).
+const docsHtml = cfg?.docs ?? /*html*/`↑: previous loop. ↓: next loop. ⏎: play loop. ⌫: delete loop(long press trash icon to purge).
   <br/>All info stays locally on your computer. No data will be uploaded.
   <br/>Chrome or Firefox recommended. Source code at <a href="https://github.com/weijiuqiao/ABLoopRecorder">Github</a>.`
 const recordingUnSupported = cfg?.recordingUnSupported ?? "Recording feature not supported by browser.";
 const cannotPlayMediaAt = cfg?.cannotPlayMediaAt ?? "Cannot play media at:";
 const errorAlert = cfg?.error ?? "Error:";
-const abortText = cfg?.abort ?? 'Abort';
+const abortText = cfg?.abort ?? '<u>A</u>bort';
 const purgeConfirmText = cfg?.purgeConfirmText ?? "Delete all loops?";
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
@@ -472,7 +471,7 @@ class App {
         }
         if (active.id !== FILE_INPUT) return;
       }
-      if (e.key == ' ' && e.target == document.body) {
+      if (e.key === ' ' && e.target === document.body) {
         e.preventDefault();
       }
       switch (e.key) {
@@ -501,7 +500,7 @@ class App {
     }
     this.pause();
     this.stopLooping();
-    if (this.video.duration > 0 && this.video.videoWidth === 0) {
+    if (this.video.videoWidth === 0) {
       //audio
       this.audio.src = this.video.src;
       this.audio.style.display = "inherit";
@@ -791,7 +790,7 @@ class App {
     [this.btnA, this.btnS, this.btnLeft, this.btnCenter, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
       .forEach(b => b.removeAttribute(DISABLED));
     this.canRecord && this.btnR.removeAttribute(DISABLED);
-    this.btnA.textContent = abortText;
+    this.btnA.innerHTML = abortText;
   }
 
   updateToRecording() {
@@ -904,13 +903,13 @@ class App {
     this.activePlayer!.currentTime = this.currentLoop.end;
     this.pause();
     this.updateToRecording();
-    this.drawOneFrame({ time: this.currentLoop.end });
     this.isRecording = true;
     this.recordAudio(() => {
       this.isRecording = false;
       this.updateToLoopState();
       this.startPlayingRecording();
     })
+    this.drawOneFrame({ time: this.currentLoop.end });
   }
 
   fireSOp() {
@@ -1039,11 +1038,12 @@ class App {
 
     this.recordedAudio?.addEventListener("ended", () => {
       if (this.activePlayer) {
-        if (this.state === State.Looping) {
+        if (this.isRecording) {
+        } else if (this.state === State.Looping) {
           this.activePlayer.currentTime = this.currentLoop.start;
           this.play();
           this.startLooping();
-        } else if (!this.isRecording) {
+        } else {
           this.play();
         }
       }
