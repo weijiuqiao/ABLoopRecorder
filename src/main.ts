@@ -15,11 +15,34 @@ import * as DB from './db';
 
 const FILE_INPUT = 'file_input';
 
+/** localization */
+const cfg = LocaleConfig[navigator.language.toLowerCase()];
+if (cfg) {
+  document.documentElement.lang = navigator.language;
+}
+const title = cfg?.title ?? 'AB Loop Recorder';
+document.title = title;
+
+const ytUrlPlaceholder = cfg?.ytUrlPlaceholder ?? "YouTube video URL";
+const btnSHtml = cfg?.btnS ?? '<u>S</u>ave loop';
+const btnEHtml = cfg?.btnE ?? '<u>E</u>dit loop';
+const btnDHtml = cfg?.btnD ?? '<u>D</u>ownload lyrics';
+const btnRHtml = cfg?.btnR ?? '<u>R</u>ecord';
+const btnAutoRecordHtml = cfg?.btnAutoRecord ?? "Auto record";
+const docsHtml = cfg?.docs ?? `↑: previous loop. ↓: next loop. ⏎: play loop. ⌫: delete loop(long press trash icon to purge).
+  <br/>All info stays locally on your computer. No data will be uploaded.
+  <br/>Chrome or Firefox recommended. Source code at <a href="https://github.com/weijiuqiao/ABLoopRecorder">Github</a>.`
+const recordingUnSupported = cfg?.recordingUnSupported ?? "Recording feature not supported by browser.";
+const cannotPlayMediaAt = cfg?.cannotPlayMediaAt ?? "Cannot play media at:";
+const errorAlert = cfg?.error ?? "Error:";
+const abortText = cfg?.abort ?? 'Abort';
+const purgeConfirmText = cfg?.purgeConfirmText ?? "Delete all loops?";
+
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
   <div id="container">
-    <h2 id="page-title">AB Loop Recorder</h2>
+    <h2 id="page-title">${title}</h2>
     <div id="youtube-url">
-      <input id='ytUrl' type="url" placeholder="YouTube video URL"  />
+      <input id='ytUrl' type="url" placeholder="${ytUrlPlaceholder}"  />
       <button id="btn-play-yt" type="submit" class="play"><img id="play_icon" src="${playSvg}"/></button>
     </div>
     <div class="input-file-container">
@@ -36,9 +59,9 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
     <div id="lyric" class="lyric">
       <button id="prevLoop">︿</button>
       <div id="lyric-ab">
-        <input id="lyric-a" class="lyric-a" type="text" placeholder="A" value="0:11.495"/>
+        <input id="lyric-a" class="lyric-a" type="text" placeholder="A" value=""/>
         <label>-</label>
-        <input id="lyric-b" class="lyric-b" type="text" placeholder="B" value="20:11.495"/>
+        <input id="lyric-b" class="lyric-b" type="text" placeholder="B" value=""/>
       </div>
       <button id="deleteLoop" class="play"><img class="delete-lyric" src='${trashSvg}'/></button>
       <input id="lyric-t" class="lyric-t" type="text" placeholder="..." value="this is insane"/>
@@ -60,18 +83,16 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = /*html*/`
       <br/>
       <button id='A'>A</button>
       <button id='B'>B</button>
-      <button id='R' class=''><u>R</u>ecord</button>
-      <button id='autoRecord'>Auto record</button>
+      <button id='R' class=''>${btnRHtml}</button>
+      <button id='autoRecord'>${btnAutoRecordHtml}</button>
       <br/>
-      <button id='S'><u>S</u>ave loop</button>
-      <button id='E'><u>E</u>dit loop</button>
-      <button id='D'><u>D</u>ownload lyrics</button>
+      <button id='S'>${btnSHtml}</button>
+      <button id='E'>${btnEHtml}</button>
+      <button id='D'>${btnDHtml}</button>
     </div>
 
     <p class="read-the-docs">
-    ↑: previous loop. ↓: next loop. ⏎: play loop. ⌫: delete loop(long press trash icon to purge).
-    <br/>All info stays locally on your computer. No data will be uploaded.
-    <br/>Chrome or Firefox recommended. Source code at <a href="https://github.com/weijiuqiao/ABLoopRecorder">Github</a>.
+    ${docsHtml}
     </p>
   </div>
 `
@@ -168,7 +189,6 @@ class App {
     this.initState();
     this.retrieveLoops();
     this.retrieveMedia();
-    this.localize();
 
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) || typeof MediaRecorder === 'undefined') {
       this.canRecord = false;
@@ -176,7 +196,7 @@ class App {
       this.btnAutoRecord.setAttribute(DISABLED, 'true');
       this.isAutoRecord = false;
       setTimeout(() => {
-        alert(this.recordingUnSupported)
+        alert(recordingUnSupported)
       }, 600);
     } else {
       this.recordedAudio = new Audio();
@@ -270,7 +290,7 @@ class App {
     button.addEventListener('mousedown', () => {
       this.pressTimer = window.setTimeout(() => {
         this.longPress = true;
-        if (confirm("Delete all loops?")) {
+        if (confirm(purgeConfirmText)) {
           this.loops.length = 0;
           this.updateLyricCard();
           DB.removeAllLoops();
@@ -497,7 +517,7 @@ class App {
   }
 
   onLoadError(e: any) {
-    alert(this.cannotPlayMediaAt + ` ${e.srcElement.currentSrc}`);
+    alert(cannotPlayMediaAt + ` ${e.srcElement.currentSrc}`);
     this.activePlayer = undefined;
   }
 
@@ -771,7 +791,7 @@ class App {
     [this.btnA, this.btnS, this.btnLeft, this.btnCenter, this.btnLeftMeta, this.btnRight, this.btnRightMeta]
       .forEach(b => b.removeAttribute(DISABLED));
     this.canRecord && this.btnR.removeAttribute(DISABLED);
-    this.btnA.textContent = this.abortText;
+    this.btnA.textContent = abortText;
   }
 
   updateToRecording() {
@@ -984,7 +1004,7 @@ class App {
           stream.getTracks().forEach(t => t.stop());
         }, duration);
       }).catch(error => {
-        alert(this.errorAlert + ` ${error.message}`);
+        alert(errorAlert + ` ${error.message}`);
         completion();
       })
   }
@@ -1061,32 +1081,6 @@ class App {
     this.animationId && cancelAnimationFrame(this.animationId);
     this.animationId = undefined;
     this.stoppedDrawing = true;
-  }
-
-  /** localization */
-  recordingUnSupported = "Recording feature not supported by browser.";
-  cannotPlayMediaAt = "Cannot play media at:";
-  errorAlert = "Error:"
-  abortText = 'Abort';
-  localize() {
-    const cfg = LocaleConfig[navigator.language.toLowerCase()];
-    if (!cfg) return;
-    document.documentElement.lang = navigator.language;
-    if (cfg.title) {
-      document.getElementById("page-title")!.innerText = cfg.title;
-      document.title = cfg.title;
-    }
-    if (cfg.ytUrlPlaceholder) this.ytUrl.placeholder = cfg.ytUrlPlaceholder;
-    if (cfg.btnR) this.btnR.innerHTML = cfg.btnR;
-    if (cfg.btnAutoRecord) this.btnAutoRecord.innerHTML = cfg.btnAutoRecord;
-    if (cfg.btnS) this.btnS.innerHTML = cfg.btnS;
-    if (cfg.btnE) this.btnE.innerHTML = cfg.btnE;
-    if (cfg.btnD) this.btnD.innerHTML = cfg.btnD;
-    if (cfg.docs) document.getElementsByClassName("read-the-docs")[0].innerHTML = cfg.docs;
-    if (cfg.recordingUnSupported) this.recordingUnSupported = cfg.recordingUnSupported;
-    if (cfg.cannotPlayMediaAt) this.cannotPlayMediaAt = cfg.cannotPlayMediaAt;
-    if (cfg.error) this.errorAlert = cfg.error;
-    if (cfg.abort) this.abortText = cfg.abort;
   }
 
 }

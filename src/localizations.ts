@@ -11,6 +11,7 @@ export type Config = {
   cannotPlayMediaAt?: string,
   error?: string,
   abort?: string,
+  purgeConfirmText?: string,
 }
 
 /**
@@ -22,6 +23,7 @@ const config: { [key: string]: Config } = {
     ytUrlPlaceholder: 'YouTube 视频链接',
     recordingUnSupported: '该浏览器不支持录音功能',
     cannotPlayMediaAt: '无法播放：',
+    purgeConfirmText: '删除全部片段？',
     error: '错误：',
     abort: '退出(A)',
     btnR: '录音(R)',
