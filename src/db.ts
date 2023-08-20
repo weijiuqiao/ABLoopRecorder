@@ -103,7 +103,7 @@ export function deleteSaveLoop(start: number, loop: Loop) {
 
 export function retrieveLoops(completion: (loops: Loop[]) => void) {
   const retrieve = () => {
-    const transaction = db.transaction(storeName, 'readwrite');
+    const transaction = db.transaction(storeName, 'readonly');
     const store = transaction.objectStore(storeName);
     // Retrieve all objects from the store
     const getAllRequest = store.getAll();
@@ -126,7 +126,7 @@ export function retrieveLoops(completion: (loops: Loop[]) => void) {
 export function retreiveMedia() {
   return new Promise((resolve) => {
     const callback = ()=>{
-      const transaction = db.transaction(mediaStoreName, 'readwrite');
+      const transaction = db.transaction(mediaStoreName, 'readonly');
       const store = transaction.objectStore(mediaStoreName);
 
       const request = store.get(mediaStoreKey);
