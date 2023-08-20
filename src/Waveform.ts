@@ -14,8 +14,8 @@ export default class Waveform {
     this.canvas = canvas;
 
 
-    canvas.width = Math.ceil(canvas.width * scaleFactor);
-    canvas.height = Math.ceil(canvas.height * scaleFactor);
+    canvas.width = Math.ceil(canvas.clientWidth * scaleFactor);
+    canvas.height = Math.ceil(canvas.clientHeight * scaleFactor);
 
     // canvas.style.width = `${canvas.width/2}px`;
     // canvas.style.height = `${canvas.height/2}px`;
